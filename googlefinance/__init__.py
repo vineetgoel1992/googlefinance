@@ -1,6 +1,7 @@
 import json
 import sys
 import demjson
+from googlefinance.company_info import CompanyInfo, Executive
 
 try:
     from urllib.request import Request, urlopen
@@ -41,6 +42,10 @@ def buildNewsUrl(symbol, qs='&start=0&num=1000'):
    return 'http://www.google.com/finance/company_news?output=json&q=' \
         + symbol + qs
 
+def buildStockPageUrl(symbol):
+    return 'http://www.google.com/finance?output=json&q=' \
+        + symbol
+
 def request(symbols):
     url = buildUrl(symbols)
     req = Request(url)
@@ -52,7 +57,6 @@ def request(symbols):
 
 def requestNews(symbol):
     url = buildNewsUrl(symbol)
-    print "url: ", url
     req = Request(url)
     resp = urlopen(req)
     content = resp.read()
@@ -69,6 +73,38 @@ def requestNews(symbol):
                 article_json.extend(cluster[article])
 
     return article_json
+
+
+def request_company_info(symbol):
+    url = buildStockPageUrl(symbol)
+    req = Request(url)
+    resp = urlopen(req)
+    content = resp.read()
+
+    # Check json request for this
+    garbage_prefix_length = 4
+    content_json = demjson.decode(content[garbage_prefix_length:].strip())[0]
+
+    name = content_json['name']
+    summary = content_json['summary'][0]
+    url = summary['url']
+    overview = summary['overview']
+    management_json = content_json['management']
+    management = []
+    for exec_json in management_json:
+        executive = Executive(
+            name=exec_json['name'],
+            title=exec_json['title']
+        )
+        management.append(executive)
+
+    return CompanyInfo(
+        name=name,
+        website=url,
+        overview=overview,
+        management=management
+    )
+
 
 def replaceKeys(quotes):
     global googleFinanceKeyToFullName
@@ -107,6 +143,11 @@ def getQuotes(symbols):
 def getNews(symbol):
     return requestNews(symbol);
 
+
+def getCompanyInfo(symbol):
+    return request_company_info(symbol)
+
+
 if __name__ == '__main__':
     try:
         symbols = sys.argv[1]
@@ -116,4 +157,5 @@ if __name__ == '__main__':
     symbols = symbols.split(',')
 
     print(json.dumps(getNews("GOOG"), indent=2))
-    print(json.dumps(getQuotes(symbols), indent=2))        
+    print(json.dumps(getQuotes(symbols), indent=2))
+    print getCompanyInfo("GOOG")
